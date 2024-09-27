@@ -1,99 +1,128 @@
 import streamlit as st
+from crewai import Agent, Task, Crew
+import os
+from langchain_community.chat_models import ChatCohere
 import cohere
 
-# Set the Cohere API key
-COHERE_API_KEY = "SB1mJfw1oJpKhiCRAXWh7Ll4jHR2P0hF3dAMznrO"
-co = cohere.Client(COHERE_API_KEY)
+# Initialize language models
+os.environ["COHERE_API_KEY"] = "SB1mJfw1oJpKhiCRAXWh7Ll4jHR2P0hF3dAMznrO"
+llm = ChatCohere()
+co = cohere.Client(os.getenv("COHERE_API_KEY"))
 
-# Define fashion-related questions
-fashion_questions = [
-    "Preferred clothing style? (casual, formal, sporty, etc.)",
-    "What colors do you usually wear?",
-    "Do you prefer any specific brands?",
-    "What type of footwear do you like?",
-    "Do you follow fashion trends?",
-    "Is comfort or style more important?",
-    "Do you like accessories?",
-    "Favorite season for fashion?",
-    "Any fabric preferences?"
-]
+# Define the agents
+# Agent 1: Fashion Analyzer (Asks questions and collects user responses)
+fashion_analyzer = Agent(
+    role="Fashion Analyzer",
+    goal="Ask relevant fashion-related questions to understand the user's style.",
+    backstory=(
+        "You're a fashion consultant who asks personalized questions to understand user preferences such as style, color, "
+        "comfort, brand preferences, and other important factors for recommending outfits."
+    ),
+    llm=llm,
+    allow_delegation=False,
+    verbose=True
+)
 
-# Function to ask questions in sequence and record answers
-def ask_next_question(state):
-    if state["question_index"] < len(fashion_questions):
-        question = fashion_questions[state["question_index"]]
-        state["question_index"] += 1
-        return question
-    else:
-        return "You've completed the questionnaire! Let me provide some recommendations."
+# Agent 2: Fashion Stylist (Provides recommendations based on responses)
+fashion_stylist = Agent(
+    role="Fashion Stylist",
+    goal="Provide tailored fashion recommendations based on the user's preferences.",
+    backstory="You are a fashion expert who recommends styles based on the user's answers provided by the Fashion Analyzer.",
+    llm=llm,
+    allow_delegation=False,
+    verbose=True
+)
 
-# Function to provide recommendations
-def provide_recommendations(answers, country=None):
-    recommendations = f"Based on your preferences:\n"
-    recommendations += f"1. Style: {answers.get('Preferred clothing style? (casual, formal, sporty, etc.)', 'Not specified')}\n"
-    recommendations += f"2. Colors: {answers.get('What colors do you usually wear?', 'Not specified')}\n"
-    recommendations += f"3. Footwear: {answers.get('What type of footwear do you like?', 'Not specified')}\n"
+# Agent 3: Brand Researcher (Researches brands relevant to user preferences)
+brand_researcher = Agent(
+    role="Brand Researcher",
+    goal="Suggest relevant fashion brands based on user preferences and location.",
+    backstory="You specialize in researching and suggesting popular brands based on the user's preferences and country.",
+    llm=llm,
+    allow_delegation=False,
+    verbose=True
+)
 
-    if country:
-        recommendations += f"\nSome popular fashion brands from {country}:\n"
-        if country.lower() == "pakistan":
-            recommendations += "- Khaadi\n- Gul Ahmed\n- Sapphire\n"
-        elif country.lower() == "usa":
-            recommendations += "- Nike\n- Levi's\n- Tommy Hilfiger\n"
-        # Add more countries as needed
+# Define tasks
+# Task 1: Collect user preferences (Handled by Fashion Analyzer)
+collect_preferences_task = Task(
+    description=(
+        "Ask the user a series of questions about their fashion preferences, including style, color, fabric, and footwear choices. "
+        "Store these preferences for generating recommendations."
+    ),
+    agent=fashion_analyzer
+)
 
-    return recommendations
+# Task 2: Generate fashion recommendations (Handled by Fashion Stylist)
+recommendation_task = Task(
+    description=(
+        "Based on the user's fashion preferences, provide curated outfit recommendations that match their style and comfort."
+    ),
+    agent=fashion_stylist
+)
 
-# Streamlit UI
-st.title("Fashion Recommender Chatbot")
+# Task 3: Brand research (Handled by Brand Researcher)
+brand_research_task = Task(
+    description=(
+        "Based on the user's preferences and country, research and suggest relevant fashion brands that align with their style."
+    ),
+    agent=brand_researcher
+)
 
-# System message input
-system_message = st.text_input("System message", value="You are a fashion expert.")
+# Setup Crew for agent task orchestration
+crew = Crew(
+    agents=[fashion_analyzer, fashion_stylist, brand_researcher],
+    tasks=[collect_preferences_task, recommendation_task, brand_research_task],
+    verbose=2
+)
 
-# Cohere settings sliders
-max_tokens = st.slider("Max tokens", 1, 2048, 512)
-temperature = st.slider("Temperature", 0.1, 4.0, 0.7)
-top_p = st.slider("Top-p (nucleus sampling)", 0.1, 1.0, 0.95)
+# Streamlit interface
+st.title("AI Fashion Stylist")
 
-# Initialize conversation state
-if "history" not in st.session_state:
-    st.session_state.history = []
-    st.session_state.question_index = 0
+# Initialize session state
+if "user_responses" not in st.session_state:
+    st.session_state.user_responses = {}
+if "task_completed" not in st.session_state:
+    st.session_state.task_completed = False
 
-# Initialize the `answers` dictionary in session state if it's not there
-if "answers" not in st.session_state:
-    st.session_state.answers = {}
+# Step 1: Ask fashion questions and collect user preferences
+if not st.session_state.task_completed:
+    st.write("Let's learn more about your fashion preferences!")
+    if "Preferred clothing style" not in st.session_state.user_responses:
+        style = st.selectbox("What's your preferred clothing style?", ["Casual", "Formal", "Sporty", "Ethnic", "Others"])
+        st.session_state.user_responses["Preferred clothing style"] = style
+    if "Preferred colors" not in st.session_state.user_responses:
+        colors = st.text_input("What colors do you usually wear?")
+        st.session_state.user_responses["Preferred colors"] = colors
+    if "Preferred brands" not in st.session_state.user_responses:
+        brands = st.text_input("Any specific brands you prefer?")
+        st.session_state.user_responses["Preferred brands"] = brands
+    if "Preferred footwear" not in st.session_state.user_responses:
+        footwear = st.selectbox("What type of footwear do you like?", ["Sneakers", "Formal shoes", "Heels", "Sandals", "Boots"])
+        st.session_state.user_responses["Preferred footwear"] = footwear
+    if "Country" not in st.session_state.user_responses:
+        country = st.text_input("Which country are you from?")
+        st.session_state.user_responses["Country"] = country
 
-# Main logic to handle question flow
-if st.session_state.question_index < len(fashion_questions):
-    # Ask next question
-    question = ask_next_question(st.session_state)
-    st.write(f"**Assistant**: {question}")
+    # Proceed to recommendations
+    if st.button("Submit Preferences"):
+        st.session_state.task_completed = True
 
-    # User input box for answers
-    user_response = st.text_input("Your answer", key="user_response")
+# Step 2: Generate recommendations and research brands
+if st.session_state.task_completed:
+    st.write("Generating your personalized fashion recommendations...")
+    # Trigger the agent to start processing the tasks
+    user_preferences = st.session_state.user_responses
+    result = crew.kickoff(inputs={"user_preferences": user_preferences})
 
-    # When user submits a response
-    if st.button("Next"):
-        if user_response:
-            # Record answer to the current question
-            current_question = fashion_questions[st.session_state.question_index - 1]
-            # Store the user's response in the `answers` dictionary
-            st.session_state.answers[current_question] = user_response
+    # Display the results
+    st.markdown("### Fashion Recommendations")
+    st.markdown(result["recommendation_task"])  # Output from Fashion Stylist
 
-else:
-    # All questions answered, ask for country for recommendations
-    st.write("You've completed the questions.")
-    country = st.text_input("Enter country for brand recommendations (e.g., Pakistan)", value="")
+    st.markdown("### Suggested Brands")
+    st.markdown(result["brand_research_task"])  # Output from Brand Researcher
 
-    if st.button("Get Recommendations"):
-        # Provide recommendations
-        recommendations = provide_recommendations(st.session_state.answers, country)
-        st.write(f"**Recommendations**: {recommendations}")
-
-# Reset the conversation
-if st.button("Reset Chat"):
-    st.session_state.history = []
-    st.session_state.question_index = 0
-    st.session_state.answers = {}
-    st.experimental_rerun()  # It's safe to use rerun only during reset
+# Reset the session
+if st.button("Start Over"):
+    st.session_state.user_responses = {}
+    st.session_state.task_completed = False
