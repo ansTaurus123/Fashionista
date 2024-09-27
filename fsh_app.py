@@ -30,9 +30,9 @@ def ask_next_question(state):
 # Function to provide recommendations
 def provide_recommendations(answers, country=None):
     recommendations = f"Based on your preferences:\n"
-    recommendations += f"1. Style: {answers.get('style', 'Not specified')}\n"
-    recommendations += f"2. Colors: {answers.get('colors', 'Not specified')}\n"
-    recommendations += f"3. Footwear: {answers.get('footwear', 'Not specified')}\n"
+    recommendations += f"1. Style: {answers.get('Preferred clothing style? (casual, formal, sporty, etc.)', 'Not specified')}\n"
+    recommendations += f"2. Colors: {answers.get('What colors do you usually wear?', 'Not specified')}\n"
+    recommendations += f"3. Footwear: {answers.get('What type of footwear do you like?', 'Not specified')}\n"
 
     if country:
         recommendations += f"\nSome popular fashion brands from {country}:\n"
@@ -64,32 +64,37 @@ if "history" not in st.session_state:
 if "answers" not in st.session_state:
     st.session_state.answers = {}
 
-# Ask next question
-question = ask_next_question(st.session_state)
-st.write(f"**Assistant**: {question}")
+# Ask next question or trigger recommendations
+if st.session_state.question_index < len(fashion_questions):
+    question = ask_next_question(st.session_state)
+    st.write(f"**Assistant**: {question}")
 
-# User input box for answers
-user_response = st.text_input("Your answer", key="user_response")
+    # User input box for answers
+    user_response = st.text_input("Your answer", key="user_response")
 
-# When user submits a response
-if st.button("Next"):
-    if user_response:
-        # Record answer to the current question
-        current_question = fashion_questions[st.session_state.question_index - 1]
-        # Store the user's response in the `answers` dictionary
-        st.session_state.answers[current_question] = user_response
-        
-        # Check if all questions are answered
-        if st.session_state.question_index < len(fashion_questions):
-            st.write(f"**Next Question**: {ask_next_question(st.session_state)}")
-        else:
-            # Provide recommendations
-            country = st.text_input("Enter country for brand recommendations (e.g., Pakistan)", value="")
-            recommendations = provide_recommendations(st.session_state.answers, country)
-            st.write(f"**Recommendations**: {recommendations}")
+    # When user submits a response
+    if st.button("Next"):
+        if user_response:
+            # Record answer to the current question
+            current_question = fashion_questions[st.session_state.question_index - 1]
+            # Store the user's response in the `answers` dictionary
+            st.session_state.answers[current_question] = user_response
+
+        # Ask the next question
+        st.experimental_rerun()
+
+else:
+    # All questions answered, ask for country for recommendations
+    country = st.text_input("Enter country for brand recommendations (e.g., Pakistan)", value="")
+
+    if st.button("Get Recommendations"):
+        # Provide recommendations
+        recommendations = provide_recommendations(st.session_state.answers, country)
+        st.write(f"**Recommendations**: {recommendations}")
 
 # Reset the conversation
 if st.button("Reset Chat"):
     st.session_state.history = []
     st.session_state.question_index = 0
     st.session_state.answers = {}
+    st.experimental_rerun()
