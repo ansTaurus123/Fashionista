@@ -18,44 +18,37 @@ fashion_questions = [
     "Any fabric preferences?"
 ]
 
-# Function to ask questions in sequence
+# Function to ask questions in sequence and record answers
 def ask_next_question(state):
     if state["question_index"] < len(fashion_questions):
         question = fashion_questions[state["question_index"]]
         state["question_index"] += 1
         return question
     else:
-        return "Thank you for answering all the questions. How can I assist you further?"
+        return "You've completed the questionnaire! Let me provide some recommendations."
 
-# Function to handle the conversation with Cohere API
-def get_response(message, system_message, max_tokens, temperature, top_p, history):
-    # Add system message and history to the conversation prompt
-    prompt = system_message + "\n" + "\n".join([f"User: {h['user']}\nAssistant: {h['assistant']}" for h in history])
+# Function to provide recommendations
+def provide_recommendations(answers, country=None):
+    recommendations = f"Based on your preferences:\n"
+    recommendations += f"1. Style: {answers.get('style', 'Not specified')}\n"
+    recommendations += f"2. Colors: {answers.get('colors', 'Not specified')}\n"
+    recommendations += f"3. Footwear: {answers.get('footwear', 'Not specified')}\n"
 
-    # Append the current message
-    prompt += f"\nUser: {message}\nAssistant:"
+    if country:
+        recommendations += f"\nSome popular fashion brands from {country}:\n"
+        if country.lower() == "pakistan":
+            recommendations += "- Khaadi\n- Gul Ahmed\n- Sapphire\n"
+        elif country.lower() == "usa":
+            recommendations += "- Nike\n- Levi's\n- Tommy Hilfiger\n"
+        # Add more countries as needed
 
-    # Call Cohere API
-    response = co.generate(
-        prompt=prompt[:1000],  # Limit prompt length to avoid issues
-        max_tokens=max_tokens,
-        temperature=temperature,
-        p=top_p
-    )
-
-    # Extract assistant's reply
-    return response.generations[0].text.strip()[:500]  # Limit reply length
+    return recommendations
 
 # Streamlit UI
 st.title("Fashion Recommender Chatbot")
 
 # System message input
 system_message = st.text_input("System message", value="You are a fashion expert.")
-
-# User details input
-gender = st.radio("Gender", ["Male", "Female", "Other"])
-age = st.number_input("Age", min_value=1, max_value=120, value=25)
-ethnicity = st.text_input("Ethnicity")
 
 # Cohere settings sliders
 max_tokens = st.slider("Max tokens", 1, 2048, 512)
@@ -66,34 +59,33 @@ top_p = st.slider("Top-p (nucleus sampling)", 0.1, 1.0, 0.95)
 if "history" not in st.session_state:
     st.session_state.history = []
     st.session_state.question_index = 0
+    st.session_state.answers = {}
 
-# Display conversation history
-for chat in st.session_state.history:
-    st.write(f"**User**: {chat['user']}")
-    st.write(f"**Assistant**: {chat['assistant']}")
+# Ask next question
+question = ask_next_question(st.session_state)
+st.write(f"**Assistant**: {question}")
 
-# User input box
-user_message = st.text_input("Your message", key="user_input")
+# User input box for answers
+user_response = st.text_input("Your answer", key="user_response")
 
-# When user submits a message
-if st.button("Send"):
-    if user_message:
-        # Ask next fashion question if available
-        question = ask_next_question(st.session_state)
-
-        # Generate assistant response using Cohere API
-        assistant_response = get_response(
-            user_message, system_message, max_tokens, temperature, top_p, st.session_state.history
-        )
-
-        # Update conversation history
-        st.session_state.history.append({"user": user_message, "assistant": assistant_response})
-
-        # Display next question if available
-        if question:
-            st.write(f"**Assistant**: {question}")
+# When user submits a response
+if st.button("Next"):
+    if user_response:
+        # Record answer
+        current_question = fashion_questions[st.session_state.question_index - 1]
+        st.session_state.answers[current_question] = user_response
+        
+        # Check if all questions are answered
+        if st.session_state.question_index < len(fashion_questions):
+            st.write(f"**Next Question**: {ask_next_question(st.session_state)}")
+        else:
+            # Provide recommendations
+            country = st.text_input("Enter country for brand recommendations (e.g., Pakistan)", value="")
+            recommendations = provide_recommendations(st.session_state.answers, country)
+            st.write(f"**Recommendations**: {recommendations}")
 
 # Reset the conversation
 if st.button("Reset Chat"):
     st.session_state.history = []
     st.session_state.question_index = 0
+    st.session_state.answers = {}
