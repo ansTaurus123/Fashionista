@@ -59,6 +59,9 @@ top_p = st.slider("Top-p (nucleus sampling)", 0.1, 1.0, 0.95)
 if "history" not in st.session_state:
     st.session_state.history = []
     st.session_state.question_index = 0
+
+# Initialize the `answers` dictionary in session state if it's not there
+if "answers" not in st.session_state:
     st.session_state.answers = {}
 
 # Ask next question
@@ -71,8 +74,9 @@ user_response = st.text_input("Your answer", key="user_response")
 # When user submits a response
 if st.button("Next"):
     if user_response:
-        # Record answer
+        # Record answer to the current question
         current_question = fashion_questions[st.session_state.question_index - 1]
+        # Store the user's response in the `answers` dictionary
         st.session_state.answers[current_question] = user_response
         
         # Check if all questions are answered
