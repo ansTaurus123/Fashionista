@@ -64,8 +64,9 @@ if "history" not in st.session_state:
 if "answers" not in st.session_state:
     st.session_state.answers = {}
 
-# Ask next question or trigger recommendations
+# Main logic to handle question flow
 if st.session_state.question_index < len(fashion_questions):
+    # Ask next question
     question = ask_next_question(st.session_state)
     st.write(f"**Assistant**: {question}")
 
@@ -80,11 +81,9 @@ if st.session_state.question_index < len(fashion_questions):
             # Store the user's response in the `answers` dictionary
             st.session_state.answers[current_question] = user_response
 
-        # Ask the next question
-        st.experimental_rerun()
-
 else:
     # All questions answered, ask for country for recommendations
+    st.write("You've completed the questions.")
     country = st.text_input("Enter country for brand recommendations (e.g., Pakistan)", value="")
 
     if st.button("Get Recommendations"):
@@ -97,4 +96,4 @@ if st.button("Reset Chat"):
     st.session_state.history = []
     st.session_state.question_index = 0
     st.session_state.answers = {}
-    st.experimental_rerun()
+    st.experimental_rerun()  # It's safe to use rerun only during reset
