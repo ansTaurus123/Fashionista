@@ -1,2 +1,4 @@
-streamlit
-cohere
+streamlit 
+crewai 
+cohere 
+langchain_community
