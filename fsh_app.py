@@ -2,7 +2,7 @@ import streamlit as st
 from groq import Groq
 
 # Initialize Groq client with the provided API key
-api_key = "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"
+api_key = "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"
 client = Groq(api_key=api_key)
 
 # Function to call the Groq API for fashion suggestions and general queries
