@@ -48,7 +48,7 @@ def generate_fashion_suggestions(personal_style, favorite_colors, preferred_mate
 
 # Streamlit app layout
 st.title("AI Fashion Recommender")
-st.write("Get avant-garde fashion trends and style suggestions tailored to your preferences.")
+st.write("Elevate Your Wardrobe, One Smart Choice at a Time")
 
 # Initialize session state for chat history
 if "messages" not in st.session_state:
