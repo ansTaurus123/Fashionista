@@ -5,33 +5,10 @@ from groq import Groq
 api_key = "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"
 client = Groq(api_key=api_key)
 
-# Function to call the Groq API for fashion suggestions
-def generate_fashion_suggestions(personal_style, favorite_colors, preferred_materials, body_type, fashion_goals):
-    user_message = {
-        "role": "user",
-        "content": (
-            f"Personal style: {personal_style} \n"
-            f"Favorite colors: {favorite_colors} \n"
-            f"Preferred materials: {preferred_materials} \n"
-            f"Body type: {body_type} \n"
-            f"Fashion goals: {fashion_goals}"
-        )
-    }
-    
+# Function to call the Groq API for fashion suggestions and general queries
+def chat_with_stylist(messages):
     chat_completion = client.chat.completions.create(
-        messages=[
-            {
-                "role": "system",
-                "content": (
-                    "Your task is to suggest avant-garde fashion trends and styles tailored to the user's preferences. "
-                    "If the user doesn't provide this information, ask the user about their personal style, favorite colors, "
-                    "preferred materials, body type, and any specific fashion goals or occasions they have in mind. "
-                    "Generate creative, bold, and unconventional fashion suggestions that push the boundaries of traditional style "
-                    "while considering the user's individual taste. Provide detailed descriptions, key pieces, and styling tips."
-                )
-            },
-            user_message
-        ],
+        messages=messages,
         model="llama3-8b-8192",
         temperature=0.5,
         max_tokens=1024,
@@ -39,35 +16,86 @@ def generate_fashion_suggestions(personal_style, favorite_colors, preferred_mate
         stop=None,
         stream=False
     )
-    
     return chat_completion.choices[0].message.content
 
 # Streamlit app layout
-st.title("AI Fashion Stylist")
-st.write("Get avant-garde fashion trends and style suggestions tailored to your preferences.")
+st.title("AI Fashion Stylist Chatbot")
+st.write("Chat with our AI-powered fashion stylist for avant-garde style suggestions or general fashion advice.")
 
-# Initialize session state for chat history
+# Initialize session state for chat history and messages
 if "messages" not in st.session_state:
-    st.session_state["messages"] = []
+    st.session_state["messages"] = [
+        {
+            "role": "system",
+            "content": (
+                "You are an AI fashion stylist. Your task is to provide avant-garde fashion suggestions, "
+                "as well as general fashion advice based on the user's input. You can also engage in casual fashion discussions. "
+                "Ask about their preferences, such as age, gender, ethnicity, personal style, favorite colors, "
+                "preferred materials, body type, and any specific fashion goals."
+            )
+        }
+    ]
 
-# Input fields for user preferences
-personal_style = st.text_input("Personal style", "Edgy, minimal, with a touch of androgyny")
-favorite_colors = st.text_input("Favorite colors", "Black, white, and deep red")
-preferred_materials = st.text_input("Preferred materials", "Leather, denim, and high-quality cotton")
-body_type = st.text_input("Body type", "Tall and lean")
-fashion_goals = st.text_input("Fashion goals", "To create a striking, fearless look for an art gallery opening")
+# Input fields for user preferences (age, ethnicity, gender)
+age = st.text_input("Age", "")
+ethnicity = st.text_input("Ethnicity", "")
+gender = st.selectbox("Gender", ["Male", "Female", "Non-binary", "Prefer not to say", "Other"])
 
-# Button to generate new suggestions
+# General input for style preferences (no specific colors or styles)
+personal_style = st.text_input("Personal style", "")
+preferred_materials = st.text_input("Preferred materials", "")
+body_type = st.text_input("Body type", "")
+fashion_goals = st.text_input("Fashion goals", "")
+
+# Chat box for ongoing conversation
+user_input = st.text_input("Ask anything related to fashion or continue the conversation:", "")
+
+# Button to submit user input
+if st.button("Send"):
+    # Append user message to chat history
+    st.session_state["messages"].append({"role": "user", "content": user_input})
+
+    # Call Groq API with chat history
+    response = chat_with_stylist(st.session_state["messages"])
+
+    # Append assistant response to chat history
+    st.session_state["messages"].append({"role": "assistant", "content": response})
+
+    # Display the conversation so far
+    st.subheader("Chat History")
+    for message in st.session_state["messages"]:
+        st.write(f"{message['role'].capitalize()}: {message['content']}")
+
+# Button to generate fashion suggestions based on input fields
 if st.button("Generate Fashion Suggestions"):
-    suggestion = generate_fashion_suggestions(personal_style, favorite_colors, preferred_materials, body_type, fashion_goals)
-    st.session_state["messages"].append(suggestion)
+    # Prepare user preferences for generating fashion suggestions
+    fashion_preferences = f"Age: {age}, Ethnicity: {ethnicity}, Gender: {gender}, Personal style: {personal_style}, Preferred materials: {preferred_materials}, Body type: {body_type}, Fashion goals: {fashion_goals}"
 
-# Display suggestions
-st.subheader("Fashion Suggestions")
-for message in st.session_state["messages"]:
-    st.write(message)
+    # Append user message to chat history with preferences
+    st.session_state["messages"].append({"role": "user", "content": fashion_preferences})
 
-# Button to reset chat
-if st.button("Reset Chat"):
-    st.session_state["messages"] = []
-    st.write("Chat reset. Please enter your preferences again.")
+    # Call Groq API with updated chat history
+    fashion_response = chat_with_stylist(st.session_state["messages"])
+
+    # Append assistant response to chat history
+    st.session_state["messages"].append({"role": "assistant", "content": fashion_response})
+
+    # Display the fashion suggestions and conversation so far
+    st.subheader("Fashion Suggestions and Chat History")
+    for message in st.session_state["messages"]:
+        st.write(f"{message['role'].capitalize()}: {message['content']}")
+
+# Button to reset chat (start a new chat)
+if st.button("Start New Chat"):
+    st.session_state["messages"] = [
+        {
+            "role": "system",
+            "content": (
+                "You are an AI fashion stylist. Your task is to provide avant-garde fashion suggestions, "
+                "as well as general fashion advice based on the user's input. You can also engage in casual fashion discussions. "
+                "Ask about their preferences, such as age, gender, ethnicity, personal style, favorite colors, "
+                "preferred materials, body type, and any specific fashion goals."
+            )
+        }
+    ]
+    st.write("Chat has been reset. You can start a new conversation.")
